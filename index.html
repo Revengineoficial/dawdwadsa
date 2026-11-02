@@ -2,18 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta
-        http-equiv="refresh"
-        content="0; url=raw13/jb.html?log=1&hx1400=1&mem=5&slots=2500000&drain=12&v=16"
-    >
-
+    <!-- no-JS fallback only; the script below is the single navigation path.
+         Meta refresh + location.replace together raced a second navigation. -->
+    <noscript><meta http-equiv="refresh" content="0; url=raw13/jb.html?log=1&hx1400=1&mem=5&slots=2500000"></noscript>
     <title>PS4 14.00 Hx Test</title>
 </head>
-
 <body>
     <script>
+        // Single redirect. drain= / v= dropped: nothing reads them (drain only
+        // via ?g=drain:N), so they were misleading dead config.
         location.replace(
-            "raw13/jb.html?log=1&hx1400=1&mem=5&slots=2500000&drain=12&v=16"
+            "raw13/jb.html?log=1&hx1400=1&mem=5&slots=2500000"
         );
     </script>
 

@@ -1,4 +1,4 @@
-import { int64 } from "./int64.js";
+import { int64 } from "./int64.js?v=1";
 
 import {
   releaseFakeCell,

@@ -1,6 +1,6 @@
 import { establishPrimitive } from "./core.js?v=28";
-import { installWindowP, pairStatus } from "./mem.js";
-import { int64 } from "./int64.js";
+import { installWindowP, pairStatus } from "./mem.js?v=1";
+import { int64 } from "./int64.js?v=1";
 import { offsetsFor, PS4 } from "./ps4_offsets.js?v=3";
 
 const outEl = document.getElementById("out");
@@ -828,6 +828,15 @@ let allDone = false,
       try {
         const r = await fetch(PAYLOAD_FILE);
         if (r.ok) blob = new Uint8Array(await r.arrayBuffer());
+        else
+          mark(
+            "PAYLOAD-FETCH-404",
+            "file=" +
+              PAYLOAD_FILE +
+              " status=" +
+              r.status +
+              " -- blob not shipped, relaunch will be skipped",
+          );
       } catch (e) {}
       if (!blob || blob[0] !== 0xe9) {
         mark("JB-RELAUNCH", "file=" + PAYLOAD_FILE + " blob=unusable");
@@ -884,7 +893,7 @@ let allDone = false,
     
     if (params.get("hx1400") === "1") {
       try {
-        const hx = await import("./hx1400_port.js?v=1");
+        const hx = await import("./hx1400_port.js?v=2");
 
         const hxOk = await hx.runHx1400({
           p: p,
@@ -3330,6 +3339,15 @@ const pid = sc(SYS.getpid).i32;
               try {
                 const r = await fetch(KPATCH_FILE);
                 if (r.ok) kpatchBlob = new Uint8Array(await r.arrayBuffer());
+                else
+                  mark(
+                    "KPATCH-FETCH-404",
+                    "file=" +
+                      KPATCH_FILE +
+                      " status=" +
+                      r.status +
+                      " -- blob not shipped for this fw, patch stage fails closed",
+                  );
               } catch (e) {
                 mark("KPATCH-FETCH-THREW", (e && e.message) || String(e));
               }
@@ -3360,6 +3378,15 @@ const pid = sc(SYS.getpid).i32;
               try {
                 const r = await fetch(PAYLOAD_FILE);
                 if (r.ok) payloadBlob = new Uint8Array(await r.arrayBuffer());
+                else
+                  mark(
+                    "PAYLOAD-FETCH-404",
+                    "file=" +
+                      PAYLOAD_FILE +
+                      " status=" +
+                      r.status +
+                      " -- blob not shipped for this fw, payload stage fails closed",
+                  );
               } catch (e) {
                 mark("PAYLOAD-FETCH-THREW", (e && e.message) || String(e));
               }

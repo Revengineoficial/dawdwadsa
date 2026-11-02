@@ -1,6 +1,6 @@
 
-import { int64 } from "./int64.js";
-import { HX1400_TABLES } from "./hx_tables.js";
+import { int64 } from "./int64.js?v=1";
+import { HX1400_TABLES } from "./hx_tables.js?v=1";
 
 
 const T = HX1400_TABLES;

@@ -1,0 +1,9 @@
+# Line endings: worktree must match the served bytes so local hashes (appcache,
+# integrity checks) equal what GitHub Pages ships.
+* text=auto eol=lf
+
+# Payloads and patches are raw kernel code -- one CRLF conversion corrupts them.
+*.bin binary
+*.m2ts binary
+*.mp4 binary
+*.png binary
